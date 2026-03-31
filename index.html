@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silver Terminal | Hyperliquid SLV/USDC</title>
+    <meta
+      name="description"
+      content="TradingView-style SLV/USDC chart interface built with open-source tooling and Hyperliquid data."
+    />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./app.css" />
+    <script defer src="./vendor/lightweight-charts/lightweight-charts.standalone.production.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark">SLV</div>
+          <div>
+            <p class="eyebrow">Open-Source Silver Terminal</p>
+            <h1>Hyperliquid SLV/USDC</h1>
+          </div>
+        </div>
+
+        <div class="market-strip">
+          <div class="market-stat">
+            <span class="market-label">Last</span>
+            <strong id="headline-price">--</strong>
+          </div>
+          <div class="market-stat">
+            <span class="market-label">Change</span>
+            <strong id="headline-change">--</strong>
+          </div>
+          <div class="market-stat">
+            <span class="market-label">Coverage</span>
+            <strong id="headline-coverage">Loading</strong>
+          </div>
+        </div>
+
+        <nav class="header-links" aria-label="External links">
+          <a href="https://github.com/ael-dev3/Silver" target="_blank" rel="noreferrer">Repo</a>
+          <a id="current-csv-link" href="./data/hyperliquid/slv_usdc_1h.csv" target="_blank" rel="noreferrer">CSV</a>
+          <a href="./data/hyperliquid/slv_usdc_metadata.json" target="_blank" rel="noreferrer">Metadata</a>
+        </nav>
+      </header>
+
+      <main class="workspace">
+        <aside class="tool-rail" aria-label="Chart tools">
+          <button class="tool-button is-active" id="tool-ema" type="button" title="Toggle EMA overlays">EMA</button>
+          <button class="tool-button is-active" id="tool-volume" type="button" title="Toggle volume overlay">VOL</button>
+          <button class="tool-button" id="tool-fit" type="button" title="Fit all visible candles">FIT</button>
+        </aside>
+
+        <section class="panel chart-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Silver Spot Chart</p>
+              <h2 id="panel-title">SLV/USDC · 1h</h2>
+            </div>
+
+            <div class="header-meta">
+              <span class="pill pill-accent" id="source-pill">Hyperliquid official API</span>
+              <span class="pill" id="pair-pill">@265</span>
+              <span class="pill" id="downloaded-pill">Loading metadata</span>
+            </div>
+          </div>
+
+          <div class="timeframe-toolbar" id="timeframe-toolbar" aria-label="Timeframe selector"></div>
+
+          <div class="legend-row">
+            <div class="legend-primary">
+              <span id="legend-symbol">SLV/USDC</span>
+              <span id="legend-interval">1h</span>
+              <span id="legend-time">--</span>
+            </div>
+            <div class="legend-secondary" id="legend-values">O -- H -- L -- C -- Vol --</div>
+          </div>
+
+          <div class="chart-surface">
+            <div class="loading-mask" id="loading-mask" aria-live="polite">Loading candles…</div>
+            <div id="chart"></div>
+          </div>
+
+          <div class="chart-footer">
+            <div class="footer-note">
+              Built with the open-source TradingView Lightweight Charts library and Hyperliquid spot candles.
+            </div>
+            <div class="footer-shortcuts">Keys: <span>1-7</span> switch timeframe</div>
+          </div>
+        </section>
+
+        <aside class="panel sidebar">
+          <section class="info-card">
+            <div class="card-header">
+              <p class="eyebrow">Current Interval</p>
+              <h3 id="sidebar-title">1h snapshot</h3>
+            </div>
+            <dl class="stats-grid" id="stats-grid">
+              <div>
+                <dt>Rows</dt>
+                <dd id="stat-rows">--</dd>
+              </div>
+              <div>
+                <dt>Last close</dt>
+                <dd id="stat-close">--</dd>
+              </div>
+              <div>
+                <dt>Range</dt>
+                <dd id="stat-range">--</dd>
+              </div>
+              <div>
+                <dt>Total volume</dt>
+                <dd id="stat-volume">--</dd>
+              </div>
+              <div>
+                <dt>Avg trades</dt>
+                <dd id="stat-trades">--</dd>
+              </div>
+              <div>
+                <dt>Coverage</dt>
+                <dd id="stat-window">--</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="info-card">
+            <div class="card-header">
+              <p class="eyebrow">Available Timeframes</p>
+              <h3>Rolling history</h3>
+            </div>
+            <div class="coverage-list" id="coverage-list"></div>
+          </section>
+
+          <section class="info-card">
+            <div class="card-header">
+              <p class="eyebrow">Stack</p>
+              <h3>Open-source deployment</h3>
+            </div>
+            <ul class="stack-list">
+              <li>Lightweight Charts 5.1.0</li>
+              <li>Apache-2.0 licensed chart library</li>
+              <li>Static GitHub Pages deployment</li>
+              <li>Client-side CSV loading from this repository</li>
+            </ul>
+          </section>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>

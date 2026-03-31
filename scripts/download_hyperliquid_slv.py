@@ -10,7 +10,7 @@ import requests
 
 API_URL = "https://api.hyperliquid.xyz/info"
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "data" / "hyperliquid"
-INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"]
+INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
 MAX_CANDLES_PER_REQUEST = 5000
 
 
