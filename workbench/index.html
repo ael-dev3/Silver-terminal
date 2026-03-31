@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silver Workbench</title>
+    <meta
+      name="description"
+      content="Clean silver chart workbench with modular TypeScript, indicators, and backtest scaffolding."
+    />
+    <meta name="theme-color" content="#0e1116" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./workbench.css" />
+    <script type="module" src="./assets/workbench.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <strong>Silver Workbench</strong>
+          <span>Clean charting, dataset switching, indicators, and strategy scaffolding.</span>
+        </div>
+        <nav class="top-links" aria-label="Project links">
+          <a href="../">Terminal</a>
+          <a href="https://github.com/ael-dev3/Silver" target="_blank" rel="noreferrer">Private repo</a>
+          <a href="https://github.com/ael-dev3/Silver-terminal" target="_blank" rel="noreferrer">Public Pages repo</a>
+        </nav>
+      </header>
+
+      <section class="control-bar">
+        <div class="control-group">
+          <label class="control-label" for="dataset-select">Dataset</label>
+          <select id="dataset-select"></select>
+        </div>
+
+        <div class="control-group control-group-wide">
+          <span class="control-label">Timeframe</span>
+          <div class="segmented-controls" id="timeframe-controls"></div>
+        </div>
+
+        <div class="control-group control-group-wide">
+          <span class="control-label">Indicators</span>
+          <div class="chip-controls" id="indicator-controls"></div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="strategy-select">Strategy</label>
+          <select id="strategy-select"></select>
+        </div>
+
+        <label class="checkbox-chip">
+          <input id="volume-toggle" type="checkbox" checked />
+          <span>Volume</span>
+        </label>
+
+        <label class="checkbox-chip">
+          <input id="log-scale-toggle" type="checkbox" />
+          <span>Log</span>
+        </label>
+
+        <div class="control-group">
+          <span class="control-label">Window</span>
+          <div class="segmented-controls" id="range-controls"></div>
+        </div>
+
+        <button class="utility-button" id="fit-button" type="button">Fit</button>
+
+        <nav class="data-links" aria-label="Data links">
+          <a id="active-csv-link" href="../data/hyperliquid/slv_usdc_1h.csv" target="_blank" rel="noreferrer">CSV</a>
+          <div id="metadata-link-wrap">
+            <a id="metadata-link" href="../data/hyperliquid/slv_usdc_metadata.json" target="_blank" rel="noreferrer">Metadata</a>
+          </div>
+        </nav>
+      </section>
+
+      <main class="workspace">
+        <section class="chart-panel">
+          <header class="panel-header">
+            <div class="title-block">
+              <p class="eyebrow">Silver chart workbench</p>
+              <h1 id="page-title">Loading...</h1>
+              <p id="page-subtitle" class="subtitle">Preparing dataset...</p>
+            </div>
+            <div class="header-badges">
+              <span class="badge" id="source-badge">Source</span>
+              <span class="badge" id="pair-badge">Pair</span>
+              <span class="badge" id="refreshed-badge">Loading</span>
+            </div>
+          </header>
+
+          <section class="headline-grid" aria-label="Market summary">
+            <div class="metric-card">
+              <span>Last</span>
+              <strong id="stat-last">--</strong>
+            </div>
+            <div class="metric-card">
+              <span>Change</span>
+              <strong id="stat-change">--</strong>
+            </div>
+            <div class="metric-card">
+              <span>Rows</span>
+              <strong id="stat-rows">--</strong>
+            </div>
+            <div class="metric-card">
+              <span>Coverage</span>
+              <strong id="stat-coverage">--</strong>
+            </div>
+            <div class="metric-card">
+              <span>Low / High</span>
+              <strong id="stat-high-low">--</strong>
+            </div>
+            <div class="metric-card">
+              <span>Volume</span>
+              <strong id="stat-volume">--</strong>
+            </div>
+          </section>
+
+          <div class="legend">
+            <span id="legend-time">--</span>
+            <div id="legend-values">No candle selected</div>
+          </div>
+
+          <div class="chart-wrap">
+            <div id="loading-state" class="overlay">Loading...</div>
+            <div id="error-state" class="overlay overlay-error" hidden></div>
+            <div id="chart-host"></div>
+          </div>
+
+          <footer class="panel-footer">
+            <div id="status-line">Waiting for dataset...</div>
+            <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noreferrer">
+              Charts by TradingView Lightweight Charts
+            </a>
+          </footer>
+        </section>
+
+        <aside class="sidebar">
+          <section class="panel">
+            <header class="panel-mini-header">
+              <h2>Overview</h2>
+            </header>
+            <div id="overview-body" class="data-rows"></div>
+          </section>
+
+          <section class="panel">
+            <header class="panel-mini-header">
+              <h2>Coverage</h2>
+            </header>
+            <div class="coverage-header">
+              <span>TF</span>
+              <span>Window</span>
+              <span>Rows</span>
+            </div>
+            <div id="coverage-body" class="coverage-body"></div>
+          </section>
+
+          <section class="panel">
+            <header class="panel-mini-header">
+              <h2>Notes</h2>
+            </header>
+            <ul id="notes-list" class="notes-list"></ul>
+          </section>
+
+          <section class="panel">
+            <header class="panel-mini-header">
+              <h2>Backtest</h2>
+            </header>
+            <p id="strategy-blurb" class="panel-copy"></p>
+            <div id="strategy-metrics" class="data-rows"></div>
+            <div class="table-wrap">
+              <table class="compact-table">
+                <thead>
+                  <tr>
+                    <th>Entry</th>
+                    <th>Entry px</th>
+                    <th>Exit</th>
+                    <th>Exit px</th>
+                    <th>Return</th>
+                  </tr>
+                </thead>
+                <tbody id="trades-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <header class="panel-mini-header">
+              <h2>Recent candles</h2>
+            </header>
+            <div class="table-wrap">
+              <table class="compact-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>O</th>
+                    <th>H</th>
+                    <th>L</th>
+                    <th>C</th>
+                    <th>Vol</th>
+                    <th>T</th>
+                  </tr>
+                </thead>
+                <tbody id="candles-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>

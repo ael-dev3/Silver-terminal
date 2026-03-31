@@ -1,0 +1,31 @@
+{
+  "name": "silver-fvg-backtest",
+  "version": "1.0.0",
+  "description": "Live terminal: https://ael-dev3.github.io/Silver-terminal/",
+  "main": "app.js",
+  "scripts": {
+    "build:workbench": "esbuild src/workbench/main.ts --bundle --format=esm --platform=browser --target=es2020 --outfile=workbench/assets/workbench.js",
+    "build": "npm run build:workbench",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ael-dev3/Silver.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ael-dev3/Silver/issues"
+  },
+  "homepage": "https://github.com/ael-dev3/Silver#readme",
+  "dependencies": {
+    "lightweight-charts": "^5.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.4",
+    "typescript": "^6.0.2"
+  }
+}

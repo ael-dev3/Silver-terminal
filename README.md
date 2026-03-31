@@ -1,16 +1,20 @@
 # Hyperliquid Silver Terminal
 
-Live terminal: https://ael-dev3.github.io/Silver-terminal/
+Live links:
+
+- Silver Terminal: https://ael-dev3.github.io/Silver-terminal/ - the original chart-first terminal for current Hyperliquid `SLV/USDC` timeframes.
+- Silver Workbench: https://ael-dev3.github.io/Silver-terminal/workbench/ - the denser TypeScript workbench with dataset switching, indicator toggles, backtest scaffolding, recent candle tables, and shareable URL state.
 
 Public Pages repo: https://github.com/ael-dev3/Silver-terminal
 
-This project centers on Hyperliquid `SLV/USDC` spot data and ships a TradingView-style static chart interface built entirely with open-source materials. It also includes a long-history weekly reference file built from Dukascopy `XAGUSD` daily data and normalized into the same candle schema.
+This project centers on Hyperliquid `SLV/USDC` spot data and ships two open-source chart interfaces: the original static terminal and a modular TypeScript workbench. It also includes a long-history weekly reference file built from Dukascopy `XAGUSD` daily data and normalized into the same candle schema.
 
 ## What is included
 
 - raw Hyperliquid candle exports under `data/hyperliquid/`
 - a long-history weekly reference file under `data/reference/`
 - a static terminal UI in `index.html`, `app.css`, and `app.js`
+- a modular TypeScript workbench in `workbench/` and `src/workbench/`
 - a reproducible download script in `scripts/download_hyperliquid_slv.py`
 - a reproducible long-history builder in `scripts/build_long_silver_weekly.py`
 - a vendored copy of TradingView Lightweight Charts 5.1.0 under `vendor/lightweight-charts/`
@@ -25,6 +29,14 @@ The hosted UI provides:
 - TradingView-style dark terminal layout
 - keyboard timeframe shortcuts
 - direct links to the current CSV and metadata file
+
+The TypeScript workbench adds:
+
+- switching between Hyperliquid `SLV/USDC` and Dukascopy `XAGUSD` weekly reference data
+- modular indicator and strategy registries under `src/workbench/`
+- range presets, log scale toggle, and volume pane toggle
+- recent candle and trade tables for direct data inspection
+- shareable URL state for dataset, timeframe, strategy, and view controls
 
 Available timeframes in the UI:
 
@@ -107,6 +119,7 @@ Caveats:
 - TradingView Lightweight Charts 5.1.0
 - Apache License 2.0 for the vendored chart library
 - custom HTML, CSS, and JavaScript app shell
+- modular TypeScript workbench bundled with esbuild
 - static GitHub Pages deployment
 
 ## Refreshing the data
@@ -115,6 +128,7 @@ Install dependencies:
 
 ```bash
 pip install -r requirements.txt
+npm install
 ```
 
 Refresh the Hyperliquid exports:
@@ -127,6 +141,18 @@ Build the long-history weekly reference file:
 
 ```bash
 python scripts/build_long_silver_weekly.py
+```
+
+Build the TypeScript workbench bundle:
+
+```bash
+npm run build
+```
+
+Run the strict TypeScript check:
+
+```bash
+npm run typecheck
 ```
 
 ## Repo layout
@@ -147,6 +173,16 @@ data/
 scripts/
   build_long_silver_weekly.py
   download_hyperliquid_slv.py
+src/
+  workbench/
+    catalog.ts
+    chartController.ts
+    dataRepository.ts
+    format.ts
+    indicators.ts
+    main.ts
+    strategies.ts
+    types.ts
 vendor/
   lightweight-charts/
     LICENSE
@@ -154,6 +190,13 @@ vendor/
 index.html
 app.css
 app.js
+workbench/
+  index.html
+  workbench.css
+  assets/
+    workbench.js
 favicon.svg
+package.json
+tsconfig.json
 requirements.txt
 ```
