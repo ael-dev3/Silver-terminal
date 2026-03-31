@@ -1,0 +1,93 @@
+{
+  "source": "Hyperliquid official API",
+  "api_url": "https://api.hyperliquid.xyz/info",
+  "downloaded_at_utc": "2026-03-31T15:23:28.290036+00:00",
+  "pair": {
+    "pair_id": "@265",
+    "pair_index": 265,
+    "pair_tokens": [
+      411,
+      0
+    ],
+    "base_token": {
+      "name": "SLV",
+      "szDecimals": 2,
+      "weiDecimals": 8,
+      "index": 411,
+      "tokenId": "0x354131c048026531b2e4bb07d3180977",
+      "isCanonical": false,
+      "evmContract": {
+        "address": "0x7ef4eba0c0200957e357627ced1884d6cb63e961",
+        "evm_extra_wei_decimals": 10
+      },
+      "fullName": null,
+      "deployerTradingFeeShare": "1.0"
+    },
+    "quote_token": {
+      "name": "USDC",
+      "szDecimals": 8,
+      "weiDecimals": 8,
+      "index": 0,
+      "tokenId": "0x6d1e7cde53ba9467b783cb7c530ce054",
+      "isCanonical": true,
+      "evmContract": {
+        "address": "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24",
+        "evm_extra_wei_decimals": -2
+      },
+      "fullName": null,
+      "deployerTradingFeeShare": "0.0"
+    },
+    "display_name": "SLV/USDC"
+  },
+  "note": "Hyperliquid candleSnapshot returns only the most recent candles for an interval. This export captures the latest available history per interval, up to roughly 5000 candles.",
+  "coverage": [
+    {
+      "interval": "1m",
+      "rows": 5197,
+      "first_open_time": 1774655520000,
+      "first_open_time_utc": "2026-03-27T23:52:00+00:00",
+      "last_close_time": 1774967339999,
+      "last_close_time_utc": "2026-03-31T14:28:59.999000+00:00"
+    },
+    {
+      "interval": "5m",
+      "rows": 5039,
+      "first_open_time": 1773455700000,
+      "first_open_time_utc": "2026-03-14T02:35:00+00:00",
+      "last_close_time": 1774967399999,
+      "last_close_time_utc": "2026-03-31T14:29:59.999000+00:00"
+    },
+    {
+      "interval": "15m",
+      "rows": 5013,
+      "first_open_time": 1770455700000,
+      "first_open_time_utc": "2026-02-07T09:15:00+00:00",
+      "last_close_time": 1774967399999,
+      "last_close_time_utc": "2026-03-31T14:29:59.999000+00:00"
+    },
+    {
+      "interval": "1h",
+      "rows": 1976,
+      "first_open_time": 1767855600000,
+      "first_open_time_utc": "2026-01-08T07:00:00+00:00",
+      "last_close_time": 1774969199999,
+      "last_close_time_utc": "2026-03-31T14:59:59.999000+00:00"
+    },
+    {
+      "interval": "4h",
+      "rows": 495,
+      "first_open_time": 1767844800000,
+      "first_open_time_utc": "2026-01-08T04:00:00+00:00",
+      "last_close_time": 1774972799999,
+      "last_close_time_utc": "2026-03-31T15:59:59.999000+00:00"
+    },
+    {
+      "interval": "1d",
+      "rows": 83,
+      "first_open_time": 1767830400000,
+      "first_open_time_utc": "2026-01-08T00:00:00+00:00",
+      "last_close_time": 1775001599999,
+      "last_close_time_utc": "2026-03-31T23:59:59.999000+00:00"
+    }
+  ]
+}
