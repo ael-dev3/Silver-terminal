@@ -85,6 +85,10 @@
       },
       timeScale: {
         borderColor: "rgba(150, 170, 197, 0.18)",
+        rightOffset: 0,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        lockVisibleTimeRangeOnResize: true,
         timeVisible: true,
         secondsVisible: false,
       },

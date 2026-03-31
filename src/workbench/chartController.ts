@@ -80,8 +80,9 @@ export class ChartController {
       },
       timeScale: {
         borderColor: "rgba(255, 255, 255, 0.08)",
-        rightOffset: 6,
+        rightOffset: 0,
         fixLeftEdge: true,
+        fixRightEdge: true,
         lockVisibleTimeRangeOnResize: true,
         timeVisible: true,
         secondsVisible: false,
