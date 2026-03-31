@@ -3,22 +3,26 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Silver Workbench</title>
+    <title>Silver Weekly Reference</title>
     <meta
       name="description"
-      content="Clean silver chart workbench with modular TypeScript, indicators, and backtest scaffolding."
+      content="Long-history weekly silver reference with clean charting, indicators, and backtest scaffolding."
     />
     <meta name="theme-color" content="#0e1116" />
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./workbench.css" />
     <script type="module" src="./assets/workbench.js"></script>
   </head>
-  <body>
+  <body
+    data-app-name="Silver Weekly Reference"
+    data-fixed-dataset="dukascopy-xagusd"
+    data-fixed-interval="1w"
+  >
     <div class="app">
       <header class="topbar">
         <div class="brand">
-          <strong>Silver Workbench</strong>
-          <span>Clean charting, dataset switching, indicators, and strategy scaffolding.</span>
+          <strong>Silver Weekly Reference</strong>
+          <span>Locked to the long-history 1w silver series for higher-timeframe review and research.</span>
         </div>
         <nav class="top-links" aria-label="Project links">
           <a href="../">Terminal</a>
@@ -28,12 +32,12 @@
       </header>
 
       <section class="control-bar">
-        <div class="control-group">
+        <div class="control-group" id="dataset-control" hidden>
           <label class="control-label" for="dataset-select">Dataset</label>
           <select id="dataset-select"></select>
         </div>
 
-        <div class="control-group control-group-wide">
+        <div class="control-group control-group-wide" id="timeframe-control" hidden>
           <span class="control-label">Timeframe</span>
           <div class="segmented-controls" id="timeframe-controls"></div>
         </div>
@@ -77,7 +81,7 @@
         <section class="chart-panel">
           <header class="panel-header">
             <div class="title-block">
-              <p class="eyebrow">Silver chart workbench</p>
+              <p class="eyebrow">Long-history silver reference</p>
               <h1 id="page-title">Loading...</h1>
               <p id="page-subtitle" class="subtitle">Preparing dataset...</p>
             </div>

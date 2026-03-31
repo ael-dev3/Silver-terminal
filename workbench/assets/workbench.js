@@ -7665,6 +7665,17 @@ var require_main = __commonJS({
       { id: "500", label: "500", bars: 500 },
       { id: "all", label: "All", bars: null }
     ];
+    function readPageConfig() {
+      const appName = document.body.dataset.appName?.trim() || "Silver Workbench";
+      const fixedDatasetId = document.body.dataset.fixedDataset?.trim() || null;
+      const requestedInterval = document.body.dataset.fixedInterval?.trim() || null;
+      const fixedInterval = INTERVAL_ORDER.includes(requestedInterval) ? requestedInterval : null;
+      return {
+        appName,
+        fixedDatasetId,
+        fixedInterval
+      };
+    }
     function mustFind(selector) {
       const element = document.querySelector(selector);
       if (!element) {
@@ -7674,6 +7685,8 @@ var require_main = __commonJS({
     }
     function getElements() {
       return {
+        datasetControl: mustFind("#dataset-control"),
+        timeframeControl: mustFind("#timeframe-control"),
         datasetSelect: mustFind("#dataset-select"),
         timeframeControls: mustFind("#timeframe-controls"),
         indicatorControls: mustFind("#indicator-controls"),
@@ -7716,12 +7729,12 @@ var require_main = __commonJS({
         INDICATORS.filter((indicator) => indicator.defaultEnabled).map((indicator) => indicator.id)
       );
     }
-    function parseInitialState() {
+    function parseInitialState(config) {
       const params = new URL(window.location.href).searchParams;
-      const requestedDatasetId = params.get("dataset");
+      const requestedDatasetId = config.fixedDatasetId ?? params.get("dataset");
       const datasetId = DATASETS.some((dataset) => dataset.id === requestedDatasetId) ? requestedDatasetId : DATASETS[0].id;
       const definition = getDatasetById(datasetId);
-      const requestedInterval = params.get("tf");
+      const requestedInterval = config.fixedInterval ?? params.get("tf");
       const interval = requestedInterval && definition.intervals.includes(requestedInterval) ? requestedInterval : definition.defaultInterval;
       const requestedStrategyId = params.get("strategy");
       const strategyId = STRATEGIES.some((strategy) => strategy.id === requestedStrategyId) ? requestedStrategyId : "none";
@@ -7750,11 +7763,12 @@ var require_main = __commonJS({
     }
     var WorkbenchApp = class {
       constructor() {
+        this.pageConfig = readPageConfig();
         this.elements = getElements();
         this.repository = new DataRepository();
         this.chart = new ChartController(this.elements.chartHost);
         this.indicatorMap = getIndicatorMap();
-        this.state = parseInitialState();
+        this.state = parseInitialState(this.pageConfig);
         this.currentOverview = null;
         this.currentDataset = null;
         this.activationToken = 0;
@@ -7784,6 +7798,8 @@ var require_main = __commonJS({
         this.elements.strategySelect.value = this.state.strategyId;
         this.elements.volumeToggle.checked = this.state.showVolume;
         this.elements.logScaleToggle.checked = this.state.priceScaleMode === bi.Logarithmic;
+        this.elements.datasetControl.hidden = this.pageConfig.fixedDatasetId !== null;
+        this.elements.timeframeControl.hidden = this.pageConfig.fixedInterval !== null;
         this.renderIndicatorControls();
         this.renderRangeControls();
         this.elements.datasetSelect.addEventListener("change", async () => {
@@ -7833,7 +7849,7 @@ var require_main = __commonJS({
             Digit7: "1w"
           };
           const nextInterval = intervalByKey[event.code];
-          if (nextInterval && datasetDefinition.intervals.includes(nextInterval)) {
+          if (this.pageConfig.fixedInterval === null && nextInterval && datasetDefinition.intervals.includes(nextInterval)) {
             event.preventDefault();
             this.state.interval = nextInterval;
             this.state.rangePreset = "all";
@@ -7976,7 +7992,7 @@ var require_main = __commonJS({
         const previous = this.currentDataset.candles[this.currentDataset.candles.length - 2] ?? latest;
         const change = latest.close - previous.close;
         const changePct = previous.close === 0 ? 0 : change / previous.close * 100;
-        document.title = `${meta.displayName} ${this.state.interval} | Silver Workbench`;
+        document.title = `${meta.displayName} ${this.state.interval} | ${this.pageConfig.appName}`;
         this.elements.pageTitle.textContent = `${meta.displayName} ${this.state.interval}`;
         this.elements.subtitle.textContent = definition.description;
         this.elements.sourceBadge.textContent = meta.sourceLabel;
@@ -8006,11 +8022,13 @@ var require_main = __commonJS({
           `${definition.label}`,
           this.state.interval,
           `${this.currentDataset.candles.length} rows`,
-          "Keys 1-7 timeframe",
           "F fit",
           "V volume",
           "L log"
         ];
+        if (this.pageConfig.fixedInterval === null) {
+          linkParts.splice(3, 0, "Keys 1-7 timeframe");
+        }
         if (meta.apiUrl) {
           linkParts.push(meta.apiUrl);
         }
@@ -8178,8 +8196,16 @@ var require_main = __commonJS({
       }
       syncUrl() {
         const url = new URL(window.location.href);
-        url.searchParams.set("dataset", this.state.datasetId);
-        url.searchParams.set("tf", this.state.interval);
+        if (this.pageConfig.fixedDatasetId === null) {
+          url.searchParams.set("dataset", this.state.datasetId);
+        } else {
+          url.searchParams.delete("dataset");
+        }
+        if (this.pageConfig.fixedInterval === null) {
+          url.searchParams.set("tf", this.state.interval);
+        } else {
+          url.searchParams.delete("tf");
+        }
         url.searchParams.set("strategy", this.state.strategyId);
         url.searchParams.set("range", this.state.rangePreset);
         const indicatorIds = [...this.state.activeIndicatorIds];

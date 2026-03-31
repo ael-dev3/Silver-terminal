@@ -34,7 +34,15 @@ const RANGE_PRESETS = [
 
 type RangePresetId = (typeof RANGE_PRESETS)[number]["id"];
 
+interface PageConfig {
+  appName: string;
+  fixedDatasetId: string | null;
+  fixedInterval: Interval | null;
+}
+
 interface Elements {
+  datasetControl: HTMLDivElement;
+  timeframeControl: HTMLDivElement;
   datasetSelect: HTMLSelectElement;
   timeframeControls: HTMLDivElement;
   indicatorControls: HTMLDivElement;
@@ -82,6 +90,21 @@ interface AppState {
   rangePreset: RangePresetId;
 }
 
+function readPageConfig(): PageConfig {
+  const appName = document.body.dataset.appName?.trim() || "Silver Workbench";
+  const fixedDatasetId = document.body.dataset.fixedDataset?.trim() || null;
+  const requestedInterval = document.body.dataset.fixedInterval?.trim() || null;
+  const fixedInterval = INTERVAL_ORDER.includes(requestedInterval as Interval)
+    ? (requestedInterval as Interval)
+    : null;
+
+  return {
+    appName,
+    fixedDatasetId,
+    fixedInterval,
+  };
+}
+
 function mustFind<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) {
@@ -92,6 +115,8 @@ function mustFind<T extends HTMLElement>(selector: string): T {
 
 function getElements(): Elements {
   return {
+    datasetControl: mustFind("#dataset-control"),
+    timeframeControl: mustFind("#timeframe-control"),
     datasetSelect: mustFind("#dataset-select"),
     timeframeControls: mustFind("#timeframe-controls"),
     indicatorControls: mustFind("#indicator-controls"),
@@ -136,15 +161,15 @@ function defaultIndicatorIds(): Set<string> {
   );
 }
 
-function parseInitialState(): AppState {
+function parseInitialState(config: PageConfig): AppState {
   const params = new URL(window.location.href).searchParams;
-  const requestedDatasetId = params.get("dataset");
+  const requestedDatasetId = config.fixedDatasetId ?? params.get("dataset");
   const datasetId = DATASETS.some((dataset) => dataset.id === requestedDatasetId)
     ? (requestedDatasetId as string)
     : DATASETS[0].id;
 
   const definition = getDatasetById(datasetId);
-  const requestedInterval = params.get("tf") as Interval | null;
+  const requestedInterval = (config.fixedInterval ?? params.get("tf")) as Interval | null;
   const interval = requestedInterval && definition.intervals.includes(requestedInterval)
     ? requestedInterval
     : definition.defaultInterval;
@@ -194,11 +219,12 @@ function getIndicatorMap(): Map<string, IndicatorDefinition> {
 }
 
 class WorkbenchApp {
+  private readonly pageConfig = readPageConfig();
   private readonly elements = getElements();
   private readonly repository = new DataRepository();
   private readonly chart = new ChartController(this.elements.chartHost);
   private readonly indicatorMap = getIndicatorMap();
-  private readonly state = parseInitialState();
+  private readonly state = parseInitialState(this.pageConfig);
   private currentOverview: DatasetOverview | null = null;
   private currentDataset: LoadedDataset | null = null;
   private activationToken = 0;
@@ -235,6 +261,8 @@ class WorkbenchApp {
     this.elements.volumeToggle.checked = this.state.showVolume;
     this.elements.logScaleToggle.checked =
       this.state.priceScaleMode === PriceScaleMode.Logarithmic;
+    this.elements.datasetControl.hidden = this.pageConfig.fixedDatasetId !== null;
+    this.elements.timeframeControl.hidden = this.pageConfig.fixedInterval !== null;
 
     this.renderIndicatorControls();
     this.renderRangeControls();
@@ -299,7 +327,11 @@ class WorkbenchApp {
       };
 
       const nextInterval = intervalByKey[event.code];
-      if (nextInterval && datasetDefinition.intervals.includes(nextInterval)) {
+      if (
+        this.pageConfig.fixedInterval === null &&
+        nextInterval &&
+        datasetDefinition.intervals.includes(nextInterval)
+      ) {
         event.preventDefault();
         this.state.interval = nextInterval;
         this.state.rangePreset = "all";
@@ -469,7 +501,7 @@ class WorkbenchApp {
     const change = latest.close - previous.close;
     const changePct = previous.close === 0 ? 0 : (change / previous.close) * 100;
 
-    document.title = `${meta.displayName} ${this.state.interval} | Silver Workbench`;
+    document.title = `${meta.displayName} ${this.state.interval} | ${this.pageConfig.appName}`;
 
     this.elements.pageTitle.textContent = `${meta.displayName} ${this.state.interval}`;
     this.elements.subtitle.textContent = definition.description;
@@ -512,11 +544,13 @@ class WorkbenchApp {
       `${definition.label}`,
       this.state.interval,
       `${this.currentDataset.candles.length} rows`,
-      "Keys 1-7 timeframe",
       "F fit",
       "V volume",
       "L log",
     ];
+    if (this.pageConfig.fixedInterval === null) {
+      linkParts.splice(3, 0, "Keys 1-7 timeframe");
+    }
     if (meta.apiUrl) {
       linkParts.push(meta.apiUrl);
     }
@@ -722,8 +756,18 @@ class WorkbenchApp {
 
   private syncUrl(): void {
     const url = new URL(window.location.href);
-    url.searchParams.set("dataset", this.state.datasetId);
-    url.searchParams.set("tf", this.state.interval);
+    if (this.pageConfig.fixedDatasetId === null) {
+      url.searchParams.set("dataset", this.state.datasetId);
+    } else {
+      url.searchParams.delete("dataset");
+    }
+
+    if (this.pageConfig.fixedInterval === null) {
+      url.searchParams.set("tf", this.state.interval);
+    } else {
+      url.searchParams.delete("tf");
+    }
+
     url.searchParams.set("strategy", this.state.strategyId);
     url.searchParams.set("range", this.state.rangePreset);
 

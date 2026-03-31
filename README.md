@@ -2,12 +2,12 @@
 
 Live links:
 
-- Silver Terminal: https://ael-dev3.github.io/Silver-terminal/ - the original chart-first terminal for current Hyperliquid `SLV/USDC` timeframes.
-- Silver Workbench: https://ael-dev3.github.io/Silver-terminal/workbench/ - the denser TypeScript workbench with dataset switching, indicator toggles, backtest scaffolding, recent candle tables, and shareable URL state.
+- Silver Terminal: https://ael-dev3.github.io/Silver-terminal/ - Hyperliquid-only `SLV/USDC` data across the checked-in rolling timeframes.
+- Silver Weekly Reference: https://ael-dev3.github.io/Silver-terminal/workbench/ - long-history `1w` silver data only, using the normalized Dukascopy `XAGUSD` weekly file.
 
 Public Pages repo: https://github.com/ael-dev3/Silver-terminal
 
-This project centers on Hyperliquid `SLV/USDC` spot data and ships two open-source chart interfaces: the original static terminal and a modular TypeScript workbench. It also includes a long-history weekly reference file built from Dukascopy `XAGUSD` daily data and normalized into the same candle schema.
+This project centers on Hyperliquid `SLV/USDC` spot data and ships two open-source chart interfaces: a Hyperliquid-only terminal and a locked weekly reference site for the long-history Dukascopy series. It also includes a long-history weekly reference file built from Dukascopy `XAGUSD` daily data and normalized into the same candle schema.
 
 ## What is included
 
@@ -30,13 +30,13 @@ The hosted UI provides:
 - keyboard timeframe shortcuts
 - direct links to the current CSV and metadata file
 
-The TypeScript workbench adds:
+The weekly reference site adds:
 
-- switching between Hyperliquid `SLV/USDC` and Dukascopy `XAGUSD` weekly reference data
+- a locked `1w` long-history view for the normalized Dukascopy `XAGUSD` series
 - modular indicator and strategy registries under `src/workbench/`
 - range presets, log scale toggle, and volume pane toggle
 - recent candle and trade tables for direct data inspection
-- shareable URL state for dataset, timeframe, strategy, and view controls
+- shareable URL state for strategy and view controls
 
 Available timeframes in the UI:
 
