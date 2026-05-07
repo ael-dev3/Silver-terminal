@@ -1,5 +1,7 @@
 # Hyperliquid Silver Terminal
 
+[![CI](https://github.com/ael-dev3/Silver/actions/workflows/ci.yml/badge.svg)](https://github.com/ael-dev3/Silver/actions/workflows/ci.yml)
+
 Live links:
 
 - Silver Terminal: https://ael-dev3.github.io/Silver-terminal/ - Hyperliquid-only `SLV/USDC` data across the checked-in rolling timeframes.
@@ -13,7 +15,8 @@ This project centers on Hyperliquid `SLV/USDC` spot data and ships two open-sour
 
 - raw Hyperliquid candle exports under `data/hyperliquid/`
 - a long-history weekly reference file under `data/reference/`
-- a static terminal UI in `index.html`, `app.css`, and `app.js`
+- a static terminal UI in `index.html`, `app.css`, and generated `app.js`
+- a typed terminal source under `src/terminal/` that reuses the shared candle validation and EMA logic
 - a modular TypeScript workbench in `workbench/` and `src/workbench/`
 - a reproducible download script in `scripts/download_hyperliquid_slv.py`
 - a reproducible long-history builder in `scripts/build_long_silver_weekly.py`
@@ -26,6 +29,7 @@ The hosted UI provides:
 - candlestick charting for every checked-in timeframe
 - volume overlay
 - EMA overlays
+- export age and latest-candle freshness badges
 - TradingView-style dark terminal layout
 - keyboard timeframe shortcuts
 - direct links to the current CSV and metadata file
@@ -54,13 +58,13 @@ The Hyperliquid market data lives under `data/hyperliquid/`.
 
 | File | Timeframe | Rows | Coverage |
 | --- | --- | ---: | --- |
-| `data/hyperliquid/slv_usdc_1m.csv` | `1m` | 5,259 | 2026-03-27 23:52 UTC to 2026-03-31 15:30 UTC |
-| `data/hyperliquid/slv_usdc_5m.csv` | `5m` | 5,052 | 2026-03-14 02:35 UTC to 2026-03-31 15:34 UTC |
-| `data/hyperliquid/slv_usdc_15m.csv` | `15m` | 5,018 | 2026-02-07 09:15 UTC to 2026-03-31 15:44 UTC |
-| `data/hyperliquid/slv_usdc_1h.csv` | `1h` | 1,977 | 2026-01-08 07:00 UTC to 2026-03-31 15:59 UTC |
-| `data/hyperliquid/slv_usdc_4h.csv` | `4h` | 495 | 2026-01-08 04:00 UTC to 2026-03-31 15:59 UTC |
-| `data/hyperliquid/slv_usdc_1d.csv` | `1d` | 83 | 2026-01-08 00:00 UTC to 2026-03-31 23:59 UTC |
-| `data/hyperliquid/slv_usdc_1w.csv` | `1w` | 12 | 2026-01-08 00:00 UTC to 2026-04-01 23:59 UTC |
+| `data/hyperliquid/slv_usdc_1m.csv` | `1m` | 5,000 | 2026-05-04 03:39 UTC to 2026-05-07 14:58 UTC |
+| `data/hyperliquid/slv_usdc_5m.csv` | `5m` | 5,000 | 2026-04-20 06:20 UTC to 2026-05-07 14:59 UTC |
+| `data/hyperliquid/slv_usdc_15m.csv` | `15m` | 5,000 | 2026-03-16 13:00 UTC to 2026-05-07 14:59 UTC |
+| `data/hyperliquid/slv_usdc_1h.csv` | `1h` | 2,864 | 2026-01-08 07:00 UTC to 2026-05-07 14:59 UTC |
+| `data/hyperliquid/slv_usdc_4h.csv` | `4h` | 717 | 2026-01-08 04:00 UTC to 2026-05-07 15:59 UTC |
+| `data/hyperliquid/slv_usdc_1d.csv` | `1d` | 119 | 2026-01-08 00:00 UTC to 2026-05-06 23:59 UTC |
+| `data/hyperliquid/slv_usdc_1w.csv` | `1w` | 17 | 2026-01-08 00:00 UTC to 2026-05-06 23:59 UTC |
 
 The repo also includes `data/hyperliquid/slv_usdc_metadata.json`, which records:
 
@@ -75,7 +79,7 @@ The repo also includes:
 
 | File | Source | Market | Timeframe | Rows | Coverage |
 | --- | --- | --- | --- | ---: | --- |
-| `data/reference/xagusd_dukascopy_1w.csv` | Dukascopy | `XAGUSD` spot | `1w` | 1,401 | 1999-06-03 00:00 UTC to 2026-03-30 23:59 UTC |
+| `data/reference/xagusd_dukascopy_1w.csv` | Dukascopy | `XAGUSD` spot | `1w` | 1,406 | 1999-06-03 00:00 UTC to 2026-05-06 23:59 UTC |
 
 This file is intended for long-range weekly research and backtesting where Hyperliquid does not yet have enough history.
 
@@ -85,6 +89,7 @@ Important caveats:
 - the schema matches the Hyperliquid CSV layout, but the market and volume construction are different
 - `trade_count` is set to `0` because the Dukascopy daily export used here does not expose per-bar trade counts
 - weekly bars are aggregated from daily candles, using Monday-based calendar weeks and partial weeks at the edges when needed
+- the weekly builder normalizes rare upstream daily OHLC envelope anomalies from Dukascopy so checked-in weekly bars remain internally consistent
 
 ## Candle schema
 
@@ -118,8 +123,8 @@ Caveats:
 
 - TradingView Lightweight Charts 5.1.0
 - Apache License 2.0 for the vendored chart library
-- custom HTML, CSS, and JavaScript app shell
-- modular TypeScript workbench bundled with esbuild
+- custom HTML and CSS app shell
+- TypeScript terminal and workbench bundles built with esbuild
 - static GitHub Pages deployment
 
 ## Refreshing the data
@@ -143,7 +148,7 @@ Build the long-history weekly reference file:
 python scripts/build_long_silver_weekly.py
 ```
 
-Build the TypeScript workbench bundle:
+Build the terminal and workbench bundles:
 
 ```bash
 npm run build
@@ -154,6 +159,14 @@ Run the strict TypeScript check:
 ```bash
 npm run typecheck
 ```
+
+Run the deployment validation:
+
+```bash
+npm test
+```
+
+This runs TypeScript checks and rebuilds both browser bundles. The source repo runs the fuller Vitest and Python dataset-integrity suite.
 
 ## Repo layout
 
@@ -174,6 +187,9 @@ scripts/
   build_long_silver_weekly.py
   download_hyperliquid_slv.py
 src/
+  terminal/
+    main.ts
+    terminalData.ts
   workbench/
     catalog.ts
     chartController.ts

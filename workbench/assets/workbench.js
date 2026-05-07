@@ -7265,39 +7265,212 @@ var init_chartController = __esm({
   }
 });
 
-// src/workbench/dataRepository.ts
-function parseCsv(text) {
+// src/workbench/timestampValidation.ts
+function parseUtcTimestampText(value) {
+  const trimmed = value.trim();
+  const match = UTC_TIMESTAMP_PATTERN.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+  const [, rawYear, rawMonth, rawDay, rawHour, rawMinute, rawSecond, rawFraction = ""] = match;
+  const year = Number(rawYear);
+  const month = Number(rawMonth);
+  const day = Number(rawDay);
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  const second = Number(rawSecond);
+  const millisecond = Number(rawFraction.slice(0, 3).padEnd(3, "0"));
+  if (year < 1e3 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) {
+    return null;
+  }
+  const epochMs = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+  if (!Number.isFinite(epochMs)) {
+    return null;
+  }
+  const date = new Date(epochMs);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || date.getUTCHours() !== hour || date.getUTCMinutes() !== minute || date.getUTCSeconds() !== second || date.getUTCMilliseconds() !== millisecond) {
+    return null;
+  }
+  return {
+    epochMs,
+    hasNonZeroSubMillisecondPrecision: /[1-9]/.test(rawFraction.slice(3))
+  };
+}
+function parseUtcTimestampTextToMs(value) {
+  return parseUtcTimestampText(value)?.epochMs ?? null;
+}
+function isUtcTimestampTextForMs(value, expectedMs) {
+  const parsed = parseUtcTimestampText(value);
+  return parsed !== null && parsed.epochMs === expectedMs && !parsed.hasNonZeroSubMillisecondPrecision;
+}
+function assertUtcTimestampTextForMs(value, expectedMs, fieldName, epochFieldName, lineNumber) {
+  const parsed = parseUtcTimestampText(value);
+  if (parsed === null) {
+    throw new Error(`Invalid ${fieldName} at line ${lineNumber}`);
+  }
+  if (parsed.epochMs !== expectedMs || parsed.hasNonZeroSubMillisecondPrecision) {
+    throw new Error(`${fieldName} does not match ${epochFieldName} at line ${lineNumber}`);
+  }
+}
+var UTC_TIMESTAMP_PATTERN;
+var init_timestampValidation = __esm({
+  "src/workbench/timestampValidation.ts"() {
+    "use strict";
+    UTC_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]00:00)$/i;
+  }
+});
+
+// src/workbench/candleValidation.ts
+function parseFiniteNumber(rawValue, fieldName, lineNumber) {
+  const trimmedValue = rawValue.trim();
+  if (!trimmedValue) {
+    throw new Error(`Invalid ${fieldName} at line ${lineNumber}`);
+  }
+  const value = Number(trimmedValue);
+  if (!Number.isFinite(value)) {
+    throw new Error(`Invalid ${fieldName} at line ${lineNumber}`);
+  }
+  return value;
+}
+function parseInteger(rawValue, fieldName, lineNumber) {
+  const trimmedValue = rawValue.trim();
+  if (!INTEGER_TEXT_PATTERN.test(trimmedValue)) {
+    throw new Error(`Invalid ${fieldName} at line ${lineNumber}`);
+  }
+  const value = parseFiniteNumber(rawValue, fieldName, lineNumber);
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`Invalid ${fieldName} at line ${lineNumber}`);
+  }
+  return value;
+}
+function validateRange(row, lineNumber) {
+  if (row.close_time <= row.open_time) {
+    throw new Error(`Invalid candle timestamps at line ${lineNumber}`);
+  }
+  const candleSpanMs = row.close_time - row.open_time + 1;
+  if (candleSpanMs > INTERVAL_SPAN_MS[row.interval]) {
+    throw new Error(`Candle span exceeds ${row.interval} at line ${lineNumber}`);
+  }
+  if (row.volume < 0) {
+    throw new Error(`Invalid volume at line ${lineNumber}`);
+  }
+  if (row.trade_count < 0) {
+    throw new Error(`Invalid trade_count at line ${lineNumber}`);
+  }
+  const highestBodyValue = Math.max(row.open, row.close);
+  const lowestBodyValue = Math.min(row.open, row.close);
+  if (row.high < highestBodyValue || row.low > lowestBodyValue || row.high < row.low) {
+    throw new Error(`Invalid OHLC range at line ${lineNumber}`);
+  }
+}
+function parseCandleCsv(text, options = {}) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length <= 1) {
     return [];
   }
+  const header = (lines[0] ?? "").replace(/^\uFEFF/, "").trim();
+  if (header !== EXPECTED_HEADER) {
+    const datasetDetail = options.datasetLabel ? ` for ${options.datasetLabel}` : "";
+    throw new Error(`Malformed candle header${datasetDetail}`);
+  }
   const candles = [];
+  let previousOpenTime = null;
+  let previousCloseTime = null;
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index]?.trim();
     if (!line) {
       continue;
     }
+    const lineNumber = index + 1;
     const parts = line.split(",");
-    if (parts.length < 12) {
-      throw new Error(`Malformed candle row at line ${index + 1}`);
+    if (parts.length !== 12) {
+      throw new Error(`Malformed candle row at line ${lineNumber}`);
     }
-    candles.push({
-      open_time: Number(parts[0]),
-      close_time: Number(parts[1]),
-      open_time_utc: parts[2],
-      close_time_utc: parts[3],
-      symbol: parts[4],
-      interval: parts[5],
-      open: Number(parts[6]),
-      high: Number(parts[7]),
-      low: Number(parts[8]),
-      close: Number(parts[9]),
-      volume: Number(parts[10]),
-      trade_count: Number(parts[11])
-    });
+    const intervalValue = parts[5]?.trim();
+    if (!VALID_INTERVALS.has(intervalValue)) {
+      throw new Error(`Invalid interval at line ${lineNumber}`);
+    }
+    const row = {
+      open_time: parseInteger(parts[0], "open_time", lineNumber),
+      close_time: parseInteger(parts[1], "close_time", lineNumber),
+      open_time_utc: parts[2]?.trim() ?? "",
+      close_time_utc: parts[3]?.trim() ?? "",
+      symbol: parts[4]?.trim() ?? "",
+      interval: intervalValue,
+      open: parseFiniteNumber(parts[6], "open", lineNumber),
+      high: parseFiniteNumber(parts[7], "high", lineNumber),
+      low: parseFiniteNumber(parts[8], "low", lineNumber),
+      close: parseFiniteNumber(parts[9], "close", lineNumber),
+      volume: parseFiniteNumber(parts[10], "volume", lineNumber),
+      trade_count: parseInteger(parts[11], "trade_count", lineNumber)
+    };
+    if (!row.symbol) {
+      throw new Error(`Missing symbol at line ${lineNumber}`);
+    }
+    if (options.expectedInterval && row.interval !== options.expectedInterval) {
+      throw new Error(`Unexpected interval at line ${lineNumber}`);
+    }
+    assertUtcTimestampTextForMs(
+      row.open_time_utc,
+      row.open_time,
+      "open_time_utc",
+      "open_time",
+      lineNumber
+    );
+    assertUtcTimestampTextForMs(
+      row.close_time_utc,
+      row.close_time,
+      "close_time_utc",
+      "close_time",
+      lineNumber
+    );
+    if (previousOpenTime !== null && row.open_time <= previousOpenTime) {
+      throw new Error(`Non-ascending open_time at line ${lineNumber}`);
+    }
+    if (previousCloseTime !== null && row.open_time <= previousCloseTime) {
+      throw new Error(`Overlapping candle timestamps at line ${lineNumber}`);
+    }
+    validateRange(row, lineNumber);
+    candles.push(row);
+    previousOpenTime = row.open_time;
+    previousCloseTime = row.close_time;
   }
-  return candles.sort((left, right) => left.open_time - right.open_time);
+  return candles;
 }
+var EXPECTED_HEADER, VALID_INTERVALS, INTERVAL_SPAN_MS, INTEGER_TEXT_PATTERN;
+var init_candleValidation = __esm({
+  "src/workbench/candleValidation.ts"() {
+    "use strict";
+    init_timestampValidation();
+    EXPECTED_HEADER = [
+      "open_time",
+      "close_time",
+      "open_time_utc",
+      "close_time_utc",
+      "symbol",
+      "interval",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "trade_count"
+    ].join(",");
+    VALID_INTERVALS = /* @__PURE__ */ new Set(["1m", "5m", "15m", "1h", "4h", "1d", "1w"]);
+    INTERVAL_SPAN_MS = {
+      "1m": 6e4,
+      "5m": 5 * 6e4,
+      "15m": 15 * 6e4,
+      "1h": 60 * 6e4,
+      "4h": 4 * 60 * 6e4,
+      "1d": 24 * 60 * 6e4,
+      "1w": 7 * 24 * 60 * 6e4
+    };
+    INTEGER_TEXT_PATTERN = /^-?\d+$/;
+  }
+});
+
+// src/workbench/dataRepository.ts
 function buildCoverage(interval, candles) {
   const first = candles[0];
   const last = candles[candles.length - 1];
@@ -7321,90 +7494,157 @@ function mapMetadata(definition, metadata) {
     note: metadata.note
   };
 }
-async function fetchText(path) {
-  const response = await fetch(path, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Failed to load ${path}`);
-  }
-  return response.text();
+function isPositiveSafeInteger(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
-async function fetchJson(path) {
-  const response = await fetch(path, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Failed to load ${path}`);
+function parseCoverageTimestamp(rawValue, expectedMs) {
+  if (typeof rawValue !== "string" || rawValue.trim().length === 0) {
+    return null;
   }
-  return response.json();
+  if (expectedMs === void 0) {
+    return parseUtcTimestampTextToMs(rawValue);
+  }
+  if (typeof expectedMs !== "number" || !Number.isSafeInteger(expectedMs) || !isUtcTimestampTextForMs(rawValue, expectedMs)) {
+    return null;
+  }
+  return expectedMs;
+}
+function isValidCoverageEntry(definition, entry) {
+  const firstOpenTime = parseCoverageTimestamp(
+    entry.first_open_time_utc,
+    entry.first_open_time
+  );
+  const lastCloseTime = parseCoverageTimestamp(
+    entry.last_close_time_utc,
+    entry.last_close_time
+  );
+  return definition.intervals.includes(entry.interval) && isPositiveSafeInteger(entry.rows) && firstOpenTime !== null && lastCloseTime !== null && firstOpenTime <= lastCloseTime;
+}
+function normalizeCoverage(definition, coverage) {
+  if (!coverage?.length) {
+    return [];
+  }
+  const deduped = /* @__PURE__ */ new Map();
+  for (const entry of coverage) {
+    if (!isValidCoverageEntry(definition, entry)) {
+      continue;
+    }
+    deduped.set(entry.interval, {
+      interval: entry.interval,
+      rows: entry.rows,
+      first_open_time_utc: entry.first_open_time_utc.trim(),
+      last_close_time_utc: entry.last_close_time_utc.trim()
+    });
+  }
+  return definition.intervals.map((interval) => deduped.get(interval)).filter((entry) => Boolean(entry));
 }
 var DataRepository;
 var init_dataRepository = __esm({
   "src/workbench/dataRepository.ts"() {
     "use strict";
+    init_candleValidation();
+    init_timestampValidation();
     DataRepository = class {
-      constructor() {
+      constructor(fetcher = fetch) {
+        this.fetcher = fetcher;
         this.overviewCache = /* @__PURE__ */ new Map();
         this.datasetCache = /* @__PURE__ */ new Map();
       }
       async loadOverview(definition) {
-        const cached = this.overviewCache.get(definition.id);
-        if (cached) {
-          return cached;
-        }
-        const promise = this.buildOverview(definition);
-        this.overviewCache.set(definition.id, promise);
-        return promise;
+        return this.loadCached(
+          this.overviewCache,
+          definition.id,
+          () => this.buildOverview(definition)
+        );
       }
       async loadDataset(definition, interval) {
         if (!definition.intervals.includes(interval)) {
           throw new Error(`${definition.label} does not support ${interval}`);
         }
         const cacheKey = `${definition.id}:${interval}`;
-        const cached = this.datasetCache.get(cacheKey);
-        if (cached) {
-          return cached;
-        }
-        const promise = this.buildDataset(definition, interval);
-        this.datasetCache.set(cacheKey, promise);
-        return promise;
+        return this.loadCached(
+          this.datasetCache,
+          cacheKey,
+          () => this.buildDataset(definition, interval)
+        );
       }
       async buildOverview(definition) {
+        let metadata = null;
         if (definition.metadataPath) {
-          const metadata = await fetchJson(definition.metadataPath);
-          const coverage2 = (metadata.coverage ?? []).map((entry) => ({
-            interval: entry.interval,
-            rows: entry.rows,
-            first_open_time_utc: entry.first_open_time_utc,
-            last_close_time_utc: entry.last_close_time_utc
-          }));
-          return {
-            definition,
-            coverage: coverage2,
-            meta: mapMetadata(definition, metadata)
-          };
+          try {
+            metadata = await this.fetchJson(definition.metadataPath);
+          } catch {
+            metadata = null;
+          }
         }
-        const coverage = await Promise.all(
-          definition.intervals.map(async (interval) => {
-            const dataset = await this.loadDataset(definition, interval);
-            return dataset.coverage;
-          })
+        const coverageByInterval = new Map(
+          normalizeCoverage(definition, metadata?.coverage).map((entry) => [entry.interval, entry])
         );
+        const missingIntervals = definition.intervals.filter(
+          (interval) => !coverageByInterval.has(interval)
+        );
+        if (missingIntervals.length) {
+          const derivedCoverage = await Promise.all(
+            missingIntervals.map(async (interval) => {
+              const dataset = await this.loadDataset(definition, interval);
+              return dataset.coverage;
+            })
+          );
+          for (const entry of derivedCoverage) {
+            coverageByInterval.set(entry.interval, entry);
+          }
+        }
+        const coverage = definition.intervals.map((interval) => coverageByInterval.get(interval)).filter((entry) => Boolean(entry));
+        if (!coverage.length) {
+          throw new Error(`No coverage available for ${definition.label}`);
+        }
         return {
           definition,
           coverage,
-          meta: {
+          meta: metadata ? mapMetadata(definition, metadata) : {
             sourceLabel: definition.source,
             displayName: definition.market
           }
         };
       }
       async buildDataset(definition, interval) {
-        const csvText = await fetchText(definition.csvPath(interval));
-        const candles = parseCsv(csvText);
+        const csvText = await this.fetchText(definition.csvPath(interval));
+        const candles = parseCandleCsv(csvText, {
+          expectedInterval: interval,
+          datasetLabel: `${definition.label} ${interval}`
+        });
         return {
           definition,
           interval,
           candles,
           coverage: buildCoverage(interval, candles)
         };
+      }
+      loadCached(cache, key, loader) {
+        const cached = cache.get(key);
+        if (cached) {
+          return cached;
+        }
+        const promise = loader().catch((error) => {
+          cache.delete(key);
+          throw error;
+        });
+        cache.set(key, promise);
+        return promise;
+      }
+      async fetchText(path) {
+        const response = await this.fetcher(path, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Failed to load ${path}`);
+        }
+        return response.text();
+      }
+      async fetchJson(path) {
+        const response = await this.fetcher(path, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Failed to load ${path}`);
+        }
+        return response.json();
       }
     };
   }
@@ -7458,89 +7698,93 @@ var init_format = __esm({
   }
 });
 
-// src/workbench/indicators.ts
-function buildMovingAverage(candles, period, mode) {
-  if (candles.length < period) {
-    return [];
+// src/workbench/freshness.ts
+function requireUtcMs(value, fieldName) {
+  const epochMs = parseUtcTimestampTextToMs(value);
+  if (epochMs === null) {
+    throw new Error(`Invalid ${fieldName}`);
   }
-  const result = [];
-  let emaValue = 0;
+  return epochMs;
+}
+function formatElapsedDuration(durationMs) {
+  const clampedMs = Math.max(0, durationMs);
+  if (clampedMs < MINUTE_MS) {
+    return "under 1m";
+  }
+  const days = Math.floor(clampedMs / DAY_MS);
+  const hours = Math.floor(clampedMs % DAY_MS / HOUR_MS);
+  const minutes = Math.floor(clampedMs % HOUR_MS / MINUTE_MS);
+  if (days > 0) {
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  }
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
+function describeExportAge(downloadedAtUtc, nowMs = Date.now()) {
+  const downloadedAtMs = requireUtcMs(downloadedAtUtc, "downloaded_at_utc");
+  return `Exported ${formatElapsedDuration(nowMs - downloadedAtMs)} ago`;
+}
+function describeCoverageFreshness(coverage, downloadedAtUtc) {
+  const downloadedAtMs = requireUtcMs(downloadedAtUtc, "downloaded_at_utc");
+  const lastCloseMs = requireUtcMs(coverage.last_close_time_utc, "last_close_time_utc");
+  const ageMs = Math.max(0, downloadedAtMs - lastCloseMs);
+  const intervalMs = INTERVAL_DURATION_MS[coverage.interval];
+  const freshThresholdMs = intervalMs * 1.5;
+  const quietThresholdMs = Math.max(intervalMs * 6, HOUR_MS);
+  const tone = ageMs <= freshThresholdMs ? "fresh" : ageMs <= quietThresholdMs ? "quiet" : "stale";
+  const shortLabel = ageMs < MINUTE_MS ? "closed at refresh" : `${formatElapsedDuration(ageMs)} before refresh`;
+  return {
+    ageMs,
+    tone,
+    shortLabel,
+    label: `Latest candle ${shortLabel}`
+  };
+}
+var MINUTE_MS, HOUR_MS, DAY_MS, INTERVAL_DURATION_MS;
+var init_freshness = __esm({
+  "src/workbench/freshness.ts"() {
+    "use strict";
+    init_timestampValidation();
+    MINUTE_MS = 6e4;
+    HOUR_MS = 60 * MINUTE_MS;
+    DAY_MS = 24 * HOUR_MS;
+    INTERVAL_DURATION_MS = {
+      "1m": MINUTE_MS,
+      "5m": 5 * MINUTE_MS,
+      "15m": 15 * MINUTE_MS,
+      "1h": HOUR_MS,
+      "4h": 4 * HOUR_MS,
+      "1d": DAY_MS,
+      "1w": 7 * DAY_MS
+    };
+  }
+});
+
+// src/workbench/movingAverage.ts
+function createEmptyValues(length) {
+  return Array(length).fill(Number.NaN);
+}
+function calculateMovingAverageValues(candles, period, mode) {
+  const values = createEmptyValues(candles.length);
+  if (candles.length < period) {
+    return values;
+  }
   let rollingSum = 0;
-  const multiplier = 2 / (period + 1);
-  for (let index = 0; index < candles.length; index += 1) {
-    const close = candles[index].close;
-    rollingSum += close;
-    if (mode === "sma") {
+  if (mode === "sma") {
+    for (let index = 0; index < candles.length; index += 1) {
+      rollingSum += candles[index].close;
       if (index >= period) {
         rollingSum -= candles[index - period].close;
       }
       if (index >= period - 1) {
-        result.push({
-          time: candles[index].open_time / 1e3,
-          value: rollingSum / period
-        });
+        values[index] = rollingSum / period;
       }
-      continue;
     }
-    if (index === period - 1) {
-      emaValue = rollingSum / period;
-      result.push({
-        time: candles[index].open_time / 1e3,
-        value: emaValue
-      });
-      continue;
-    }
-    if (index >= period) {
-      emaValue = close * multiplier + emaValue * (1 - multiplier);
-      result.push({
-        time: candles[index].open_time / 1e3,
-        value: emaValue
-      });
-    }
-  }
-  return result;
-}
-var INDICATORS;
-var init_indicators = __esm({
-  "src/workbench/indicators.ts"() {
-    "use strict";
-    INDICATORS = [
-      {
-        id: "ema20",
-        label: "EMA 20",
-        color: "#f5a524",
-        lineWidth: 2,
-        defaultEnabled: true,
-        compute: (candles) => buildMovingAverage(candles, 20, "ema")
-      },
-      {
-        id: "ema50",
-        label: "EMA 50",
-        color: "#5e7cff",
-        lineWidth: 2,
-        defaultEnabled: true,
-        compute: (candles) => buildMovingAverage(candles, 50, "ema")
-      },
-      {
-        id: "sma20",
-        label: "SMA 20",
-        color: "#a4abb6",
-        lineWidth: 1,
-        defaultEnabled: false,
-        compute: (candles) => buildMovingAverage(candles, 20, "sma")
-      }
-    ];
-  }
-});
-
-// src/workbench/strategies.ts
-function computeEma(candles, period) {
-  const values = Array(candles.length).fill(Number.NaN);
-  if (candles.length < period) {
     return values;
   }
   const multiplier = 2 / (period + 1);
-  let rollingSum = 0;
   let emaValue = 0;
   for (let index = 0; index < candles.length; index += 1) {
     const close = candles[index].close;
@@ -7557,6 +7801,63 @@ function computeEma(candles, period) {
   }
   return values;
 }
+function buildMovingAverageSeries(candles, period, mode) {
+  const values = calculateMovingAverageValues(candles, period, mode);
+  const series = [];
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (Number.isNaN(value)) {
+      continue;
+    }
+    series.push({
+      time: candles[index].open_time / 1e3,
+      value
+    });
+  }
+  return series;
+}
+var init_movingAverage = __esm({
+  "src/workbench/movingAverage.ts"() {
+    "use strict";
+  }
+});
+
+// src/workbench/indicators.ts
+var INDICATORS;
+var init_indicators = __esm({
+  "src/workbench/indicators.ts"() {
+    "use strict";
+    init_movingAverage();
+    INDICATORS = [
+      {
+        id: "ema20",
+        label: "EMA 20",
+        color: "#f5a524",
+        lineWidth: 2,
+        defaultEnabled: true,
+        compute: (candles) => buildMovingAverageSeries(candles, 20, "ema")
+      },
+      {
+        id: "ema50",
+        label: "EMA 50",
+        color: "#5e7cff",
+        lineWidth: 2,
+        defaultEnabled: true,
+        compute: (candles) => buildMovingAverageSeries(candles, 50, "ema")
+      },
+      {
+        id: "sma20",
+        label: "SMA 20",
+        color: "#a4abb6",
+        lineWidth: 1,
+        defaultEnabled: false,
+        compute: (candles) => buildMovingAverageSeries(candles, 20, "sma")
+      }
+    ];
+  }
+});
+
+// src/workbench/strategies.ts
 function calculateMaxDrawdown(equityCurve) {
   let peak = equityCurve[0] ?? 1;
   let maxDrawdown = 0;
@@ -7566,15 +7867,22 @@ function calculateMaxDrawdown(equityCurve) {
   }
   return maxDrawdown * 100;
 }
+function markToMarketEquity(equityAtEntry, entryPrice, currentPrice) {
+  if (entryPrice <= 0) {
+    return equityAtEntry;
+  }
+  return equityAtEntry * (currentPrice / entryPrice);
+}
 function runEmaCross(candles) {
-  const fast = computeEma(candles, 20);
-  const slow = computeEma(candles, 50);
+  const fast = calculateMovingAverageValues(candles, 20, "ema");
+  const slow = calculateMovingAverageValues(candles, 50, "ema");
   const trades = [];
   const equityCurve = [1];
   let inPosition = false;
   let entryPrice = 0;
   let entryTime = "";
-  let equity = 1;
+  let realizedEquity = 1;
+  let equityAtEntry = 1;
   for (let index = 1; index < candles.length; index += 1) {
     if (Number.isNaN(fast[index - 1]) || Number.isNaN(slow[index - 1]) || Number.isNaN(fast[index]) || Number.isNaN(slow[index])) {
       continue;
@@ -7585,28 +7893,38 @@ function runEmaCross(candles) {
       inPosition = true;
       entryPrice = candles[index].close;
       entryTime = candles[index].close_time_utc;
+      equityAtEntry = realizedEquity;
+      equityCurve.push(realizedEquity);
       continue;
     }
-    if (inPosition && crossedDown) {
-      const exitPrice = candles[index].close;
-      const tradeReturn = (exitPrice - entryPrice) / entryPrice;
-      equity *= 1 + tradeReturn;
-      equityCurve.push(equity);
-      trades.push({
-        entryTime,
-        exitTime: candles[index].close_time_utc,
+    if (inPosition) {
+      const markedEquity = markToMarketEquity(
+        equityAtEntry,
         entryPrice,
-        exitPrice,
-        returnPct: tradeReturn * 100
-      });
-      inPosition = false;
+        candles[index].close
+      );
+      equityCurve.push(markedEquity);
+      if (crossedDown) {
+        const exitPrice = candles[index].close;
+        const tradeReturn = (exitPrice - entryPrice) / entryPrice;
+        realizedEquity = markedEquity;
+        trades.push({
+          entryTime,
+          exitTime: candles[index].close_time_utc,
+          entryPrice,
+          exitPrice,
+          returnPct: tradeReturn * 100
+        });
+        inPosition = false;
+      }
+      continue;
     }
+    equityCurve.push(realizedEquity);
   }
   if (inPosition) {
     const last = candles[candles.length - 1];
     const tradeReturn = (last.close - entryPrice) / entryPrice;
-    equity *= 1 + tradeReturn;
-    equityCurve.push(equity);
+    realizedEquity = markToMarketEquity(equityAtEntry, entryPrice, last.close);
     trades.push({
       entryTime,
       exitTime: last.close_time_utc,
@@ -7624,7 +7942,7 @@ function runEmaCross(candles) {
     trades,
     tradeCount: trades.length,
     winRate: winners / trades.length * 100,
-    totalReturnPct: (equity - 1) * 100,
+    totalReturnPct: (realizedEquity - 1) * 100,
     maxDrawdownPct: calculateMaxDrawdown(equityCurve)
   };
 }
@@ -7632,6 +7950,7 @@ var STRATEGIES;
 var init_strategies = __esm({
   "src/workbench/strategies.ts"() {
     "use strict";
+    init_movingAverage();
     STRATEGIES = [
       {
         id: "none",
@@ -7657,6 +7976,7 @@ var require_main = __commonJS({
     init_chartController();
     init_dataRepository();
     init_format();
+    init_freshness();
     init_indicators();
     init_strategies();
     var INTERVAL_ORDER = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
@@ -7704,6 +8024,7 @@ var require_main = __commonJS({
         sourceBadge: mustFind("#source-badge"),
         pairBadge: mustFind("#pair-badge"),
         refreshedBadge: mustFind("#refreshed-badge"),
+        freshnessBadge: mustFind("#freshness-badge"),
         activeCsvLink: mustFind("#active-csv-link"),
         metadataLink: mustFind("#metadata-link"),
         metadataLinkWrap: mustFind("#metadata-link-wrap"),
@@ -7761,6 +8082,10 @@ var require_main = __commonJS({
     }
     function getIndicatorMap() {
       return new Map(INDICATORS.map((indicator) => [indicator.id, indicator]));
+    }
+    function applyFreshnessTone(element, tone) {
+      element.classList.remove("freshness-fresh", "freshness-quiet", "freshness-stale");
+      element.classList.add(`freshness-${tone}`);
     }
     var WorkbenchApp = class {
       constructor() {
@@ -7998,7 +8323,20 @@ var require_main = __commonJS({
         this.elements.subtitle.textContent = definition.description;
         this.elements.sourceBadge.textContent = meta.sourceLabel;
         this.elements.pairBadge.textContent = meta.pairId ?? definition.market;
-        this.elements.refreshedBadge.textContent = meta.downloadedAtUtc ? `Refreshed ${formatDateTime(meta.downloadedAtUtc)}` : "Reference dataset";
+        this.elements.refreshedBadge.textContent = meta.downloadedAtUtc ? describeExportAge(meta.downloadedAtUtc) : "Reference dataset";
+        this.elements.refreshedBadge.title = meta.downloadedAtUtc ? `Refreshed ${formatDateTime(meta.downloadedAtUtc)}` : "";
+        if (meta.downloadedAtUtc) {
+          const freshness = describeCoverageFreshness(
+            this.currentDataset.coverage,
+            meta.downloadedAtUtc
+          );
+          this.elements.freshnessBadge.hidden = false;
+          this.elements.freshnessBadge.textContent = freshness.label;
+          applyFreshnessTone(this.elements.freshnessBadge, freshness.tone);
+        } else {
+          this.elements.freshnessBadge.hidden = true;
+          this.elements.freshnessBadge.textContent = "";
+        }
         this.elements.activeCsvLink.href = definition.csvPath(this.state.interval);
         this.elements.activeCsvLink.textContent = `${this.state.interval.toUpperCase()} CSV`;
         if (definition.metadataPath) {
@@ -8027,6 +8365,11 @@ var require_main = __commonJS({
           "V volume",
           "L log"
         ];
+        if (meta.downloadedAtUtc) {
+          linkParts.push(
+            describeCoverageFreshness(this.currentDataset.coverage, meta.downloadedAtUtc).shortLabel
+          );
+        }
         if (this.pageConfig.fixedInterval === null) {
           linkParts.splice(3, 0, "Keys 1-7 timeframe");
         }
